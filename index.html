@@ -431,8 +431,26 @@ function unitSel(sel,cls){return `<select class="${cls||''}">${UNITS.map(u=>`<op
 function confirmBox(msg){return new Promise(res=>{openModal(`<h2>${esc(msg)}</h2><button class="btn red" id="cy">네, 지울게요</button><button class="btn gray" id="cn">아니요</button>`);$('#cy').onclick=()=>{closeModal();res(true)};$('#cn').onclick=()=>{closeModal();res(false)}})}
 
 function buyRow(){return `<div class="row"><input class="full ri" list="dlI" placeholder="재료 이름 (예: 양파)"><input class="rq" type="number" inputmode="decimal" step="any" min="0" placeholder="양"><div style="display:contents">${unitSel('kg','ru')}</div><input class="ra" type="number" inputmode="numeric" min="0" placeholder="금액(원)"></div>`}
+let _ai=null;
+async function aiModel(){
+  if(_ai)return _ai;
+  const V='11.10.0',A=await import('https://www.gstatic.com/firebasejs/'+V+'/firebase-app.js'),B=await import('https://www.gstatic.com/firebasejs/'+V+'/firebase-ai.js');
+  const app=A.initializeApp(FB,'ai');
+  _ai=B.getGenerativeModel(B.getAI(app,{backend:new B.GoogleAIBackend()}),{model:'gemini-2.5-flash',generationConfig:{responseMimeType:'application/json',temperature:0}});
+  return _ai;
+}
+function shrink(file){return new Promise((res,rej)=>{const im=new Image(),u=URL.createObjectURL(file);im.onload=()=>{const k=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',.85).split(',')[1])};im.onerror=rej;im.src=u})}
+async function readReceipt(file){
+  const [m,b64]=[await aiModel(),await shrink(file)];
+  const prompt=`이 사진은 한국 가게의 식자재 구매 영수증이에요. 아래 JSON만 출력하세요.
+{"store":"가게 이름","date":"YYYY-MM-DD (없으면 빈 문자열)","items":[{"item":"재료 이름","qty":숫자,"unit":"단위","amount":해당 품목 총금액(원, 숫자)}]}
+규칙: unit은 ${UNITS.join(',')} 중 하나. 영수증에 무게/용량이 있으면 그 단위(g,kg,ml,L)로, 없으면 개수 단위로. amount는 단가가 아니라 그 줄의 합계. 할인은 amount에 반영. 비슷한 기존 재료 이름이 있으면 그 이름을 그대로 쓰세요: ${allItems().slice(0,80).join(', ')||'(없음)'}. 재료가 아닌 줄(합계, 부가세, 카드정보)은 제외. 오늘 날짜는 ${today()}.`;
+  const r=await m.generateContent([prompt,{inlineData:{mimeType:'image/jpeg',data:b64}}]);
+  return JSON.parse(r.response.text());
+}
 function openBuy(){
   openModal(`<h2>🛒 장봤어요</h2><p class="sub">영수증 한 장씩 입력해요.</p>${dls()}
+  <input type="file" id="rcpt" accept="image/*" hidden><button class="btn gray" id="rbtn">📷 영수증 사진으로 자동 입력</button><p class="sub" id="rst"></p>
   <label>날짜</label><input type="date" id="bd" value="${today()}">
   <label>어디서 샀어요?</label><input id="bs" list="dlS" placeholder="예: 시장, 쿠팡, 농협마트">
   <div id="rows">${buyRow()}</div>
@@ -440,6 +458,24 @@ function openBuy(){
   <button class="btn" id="bsave">저장</button><button class="btn gray" onclick="closeModal()">닫기</button>`);
   const rows=$('#rows');
   $('#addrow').onclick=()=>rows.insertAdjacentHTML('beforeend',buyRow());
+  $('#rbtn').onclick=()=>$('#rcpt').click();
+  $('#rcpt').onchange=async e=>{
+    const f=e.target.files[0];if(!f)return;
+    const st=$('#rst');st.textContent='영수증을 읽는 중이에요... (10~20초)';$('#rbtn').disabled=true;
+    try{
+      const d=await readReceipt(f);
+      if(d.date)$('#bd').value=d.date;
+      if(d.store)$('#bs').value=norm(d.store);
+      const its=(d.items||[]).filter(x=>x&&x.item);
+      if(!its.length)throw new Error('empty');
+      rows.innerHTML=its.map(()=>buyRow()).join('');
+      [...rows.querySelectorAll('.row')].forEach((r,i)=>{const x=its[i];
+        r.querySelector('.ri').value=norm(x.item);r.querySelector('.rq').value=x.qty>0?x.qty:1;
+        const u=r.querySelector('.ru');u.value=UNITS.includes(x.unit)?x.unit:'개';r.querySelector('.ra').value=Math.round(+x.amount||0)});
+      st.textContent='✅ '+its.length+'개 읽었어요. 이름·양·금액이 맞는지 꼭 확인하고 저장하세요!';
+    }catch(err){console.error(err);st.textContent='읽지 못했어요 ('+((err&&(err.code||err.message))||'오류')+'). 사진을 더 밝고 반듯하게 찍어보거나 직접 입력해 주세요.'}
+    $('#rbtn').disabled=false;e.target.value='';
+  };
   rows.addEventListener('change',e=>{if(e.target.classList.contains('ri')){const i=itemInfo(norm(e.target.value));if(i){const r=e.target.closest('.row');r.querySelector('.ru').value=i.unit}}});
   $('#bsave').onclick=async()=>{
     const date=$('#bd').value,store=norm($('#bs').value);
