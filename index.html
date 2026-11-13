@@ -432,21 +432,23 @@ function confirmBox(msg){return new Promise(res=>{openModal(`<h2>${esc(msg)}</h2
 
 function buyRow(){return `<div class="row"><input class="full ri" list="dlI" placeholder="재료 이름 (예: 양파)"><input class="rq" type="number" inputmode="decimal" step="any" min="0" placeholder="양"><div style="display:contents">${unitSel('kg','ru')}</div><input class="ra" type="number" inputmode="numeric" min="0" placeholder="금액(원)"></div>`}
 let _ai=null;
-async function aiModel(){
+const AI_MODELS=['gemini-3.5-flash','gemini-3.1-flash-lite'];
+async function aiModels(){
   if(_ai)return _ai;
   const V='11.10.0',A=await import('https://www.gstatic.com/firebasejs/'+V+'/firebase-app.js'),B=await import('https://www.gstatic.com/firebasejs/'+V+'/firebase-ai.js');
-  const app=A.initializeApp(FB,'ai');
-  _ai=B.getGenerativeModel(B.getAI(app,{backend:new B.GoogleAIBackend()}),{model:'gemini-2.5-flash',generationConfig:{responseMimeType:'application/json',temperature:0}});
+  const ai=B.getAI(A.initializeApp(FB,'ai'),{backend:new B.GoogleAIBackend()});
+  _ai=AI_MODELS.map(n=>B.getGenerativeModel(ai,{model:n,generationConfig:{responseMimeType:'application/json',temperature:0}}));
   return _ai;
 }
 function shrink(file){return new Promise((res,rej)=>{const im=new Image(),u=URL.createObjectURL(file);im.onload=()=>{const k=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',.85).split(',')[1])};im.onerror=rej;im.src=u})}
 async function readReceipt(file){
-  const [m,b64]=[await aiModel(),await shrink(file)];
+  const [ms,b64]=[await aiModels(),await shrink(file)];
   const prompt=`이 사진은 한국 가게의 식자재 구매 영수증이에요. 아래 JSON만 출력하세요.
 {"store":"가게 이름","date":"YYYY-MM-DD (없으면 빈 문자열)","items":[{"item":"재료 이름","qty":숫자,"unit":"단위","amount":해당 품목 총금액(원, 숫자)}]}
 규칙: unit은 ${UNITS.join(',')} 중 하나. 영수증에 무게/용량이 있으면 그 단위(g,kg,ml,L)로, 없으면 개수 단위로. amount는 단가가 아니라 그 줄의 합계. 할인은 amount에 반영. 비슷한 기존 재료 이름이 있으면 그 이름을 그대로 쓰세요: ${allItems().slice(0,80).join(', ')||'(없음)'}. 재료가 아닌 줄(합계, 부가세, 카드정보)은 제외. 오늘 날짜는 ${today()}.`;
-  const r=await m.generateContent([prompt,{inlineData:{mimeType:'image/jpeg',data:b64}}]);
-  return JSON.parse(r.response.text());
+  let last;
+  for(const m of ms){try{const r=await m.generateContent([prompt,{inlineData:{mimeType:'image/jpeg',data:b64}}]);return JSON.parse(r.response.text())}catch(e){last=e;console.warn(e)}}
+  throw last;
 }
 function openBuy(){
   openModal(`<h2>🛒 장봤어요</h2><p class="sub">영수증 한 장씩 입력해요.</p>${dls()}
