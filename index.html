@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>엄마가게 가계부</title>
+<meta name="theme-color" content="#2f7d5b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="가계부">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<style>
+:root{--bg:#fbf7f0;--card:#fff;--ink:#2b2b2b;--sub:#7a7468;--line:#eadfce;--green:#2f7d5b;--greenbg:#e6f3ec;--red:#c0392b;--redbg:#fbeae7;--amber:#b7791f;--amberbg:#fdf3dc}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;font-size:16px;line-height:1.5}
+#app{max-width:520px;margin:0 auto;min-height:100vh;padding:0 14px 96px}
+header{display:flex;justify-content:space-between;align-items:center;padding:16px 2px 8px}
+header h1{font-size:20px;margin:0}
+.badge{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--amberbg);color:var(--amber)}
+.badge.db{background:var(--greenbg);color:var(--green)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+.card.hl{background:var(--greenbg);border-color:#bfe0cf}
+.card.warn{background:var(--amberbg);border-color:#f0dca8}
+.card h2{font-size:17px;margin:0 0 8px}
+.card h3{font-size:15px;margin:14px 0 6px}
+p{margin:6px 0}
+.sub{color:var(--sub);font-size:14px}
+.btn{display:block;width:100%;min-height:52px;border:0;border-radius:14px;background:var(--green);color:#fff;font-size:17px;font-weight:700;padding:12px;cursor:pointer;margin:8px 0}
+.btn.alt{background:#fff;color:var(--green);border:2px solid var(--green)}
+.btn.gray{background:#efe9dd;color:var(--ink)}
+.btn.red{background:var(--red)}
+.btn.sm{min-height:40px;font-size:14px;padding:8px 12px;width:auto;display:inline-block;margin:4px 4px 4px 0}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.big{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:92px;border:0;border-radius:16px;background:#fff;border:1px solid var(--line);font-size:15px;font-weight:700;color:var(--ink);cursor:pointer;gap:4px}
+.big span{font-size:30px}
+.kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line)}
+.kv:last-child{border-bottom:0}
+.kv b{font-variant-numeric:tabular-nums}
+.kv.total{font-size:18px;border-top:2px solid var(--ink);border-bottom:0;margin-top:4px}
+.pos{color:var(--green)}.neg{color:var(--red)}
+label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
+input,select{width:100%;min-height:46px;font-size:16px;padding:8px 10px;border:1px solid #d9ccb6;border-radius:10px;background:#fff;color:var(--ink);font-family:inherit}
+.row{display:grid;grid-template-columns:1fr 84px 1.2fr;gap:6px;margin:6px 0;padding:10px;background:#faf6ee;border-radius:12px}
+.row .full{grid-column:1/-1}
+.mrow{display:grid;grid-template-columns:1.4fr 1fr 80px;gap:6px;margin:6px 0;align-items:center}
+.mrow .c{grid-column:1/-1;font-size:13px;color:var(--sub);margin-top:-2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.chip{padding:9px 14px;border-radius:99px;border:1px solid #d9ccb6;background:#fff;font-size:15px;cursor:pointer}
+.chip.on{background:var(--green);color:#fff;border-color:var(--green)}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:center;z-index:5}
+nav .in{display:flex;width:100%;max-width:520px}
+nav button{flex:1;border:0;background:none;padding:9px 0 10px;font-size:12px;color:var(--sub);cursor:pointer;font-family:inherit}
+nav button span{display:block;font-size:22px;line-height:1.1}
+nav button.on{color:var(--green);font-weight:700}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+#modal[hidden]{display:none}
+.sheet{background:var(--bg);width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:16px 16px 28px}
+.sheet h2{margin:0 0 4px;font-size:19px}
+#toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:#2b2b2b;color:#fff;padding:10px 18px;border-radius:99px;font-size:15px;z-index:30;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center}
+#toast.on{opacity:1}
+.log{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.log:last-child{border-bottom:0}
+.log .t{font-size:12px;padding:2px 8px;border-radius:99px;background:#efe9dd;white-space:nowrap}
+.log .t.buy{background:#e3eefb;color:#1f5fa8}.log .t.waste{background:var(--redbg);color:var(--red)}.log .t.sale{background:var(--greenbg);color:var(--green)}.log .t.count{background:var(--amberbg);color:var(--amber)}
+.log .m{flex:1;min-width:0;font-size:14px}
+.log .m small{display:block;color:var(--sub)}
+.x{border:0;background:none;color:#aaa;font-size:20px;cursor:pointer;padding:6px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--sub);font-weight:600;font-size:12px}
+.stock{display:grid;grid-template-columns:1fr 110px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.stock small{display:block;color:var(--sub);font-size:12px}
+.inl{display:flex;gap:6px;align-items:center}
+.inl input{min-width:0}
+.inl i{font-style:normal;color:var(--sub);font-size:14px;min-width:26px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header><h1>🧾 엄마가게 가계부</h1><span style="display:flex;gap:8px;align-items:center"><span class="badge" id="badge"></span><button class="x" data-act="settings" aria-label="설정" style="font-size:22px">⚙️</button></span></header>
+  <main id="main"></main>
+</div>
+<nav><div class="in" id="tabs"></div></nav>
+<div id="modal" hidden></div>
+<div id="toast"></div>
+
+<script>
+const COLS=['purchases','wastes','sales','counts','menus'];
+const UNITS=['g','kg','ml','L','개','봉','단','마리','판','박스','포기'];
+const CHANNELS=['배민','쿠팡이츠','매장','기타'];
+const REASONS=['상했어요','유통기한','만들다 실수','서비스로 줬어요','기타'];
+const S={d:{purchases:[],wastes:[],sales:[],counts:[],menus:[]},mode:'loading',tab:'home',db:null,draft:{},extra:[],stockDate:null,pick:null};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const won=n=>Math.round(n||0).toLocaleString('ko-KR')+'원';
+const num=n=>{n=+n||0;return (Math.round(n*100)/100).toLocaleString('ko-KR')};
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const today=()=>ymd(new Date());
+const md=s=>{const p=String(s).split('-');return (+p[1])+'/'+(+p[2])};
+const dayDiff=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5);
+const norm=s=>String(s||'').trim().replace(/\s+/g,' ');
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const sum=(a,f)=>a.reduce((t,x)=>t+(+f(x)||0),0);
+
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),2200)}
+
+/* ---------- 저장소 (Firebase 공유 DB, 안 되면 이 폰에만 저장) ---------- */
+const FB={apiKey:"AIzaSyDyO6nfV1JJzUSYtIdhb0Os_Q5n8Hp5k9w",authDomain:"mom-shop-ledger.firebaseapp.com",projectId:"mom-shop-ledger",storageBucket:"mom-shop-ledger.firebasestorage.app",messagingSenderId:"944790109555",appId:"1:944790109555:web:92cfef27b6a28706881906"};
+const LS='mom_ledger_v1',LSCODE='mom_ledger_code';
+S.code='';S.base=null;
+function lsLoad(){try{const j=JSON.parse(localStorage.getItem(LS)||'null');if(j)COLS.forEach(c=>S.d[c]=j[c]||[])}catch(e){}}
+function lsSave(){try{localStorage.setItem(LS,JSON.stringify(S.d))}catch(e){}}
+function getCode(){
+  try{const m=location.hash.match(/code=([A-Za-z0-9]{20,64})/);if(m){localStorage.setItem(LSCODE,m[1]);return m[1]}}catch(e){}
+  try{return localStorage.getItem(LSCODE)||''}catch(e){return ''}
+}
+function newCode(){const a=new Uint8Array(24);crypto.getRandomValues(a);const cs='abcdefghijkmnopqrstuvwxyz23456789';return Array.from(a).map(x=>cs[x%cs.length]).join('')}
+function shareLink(){return location.origin+location.pathname+'#code='+S.code}
+function fail(e){toast('저장이 안 됐어요 ('+((e&&e.code)||'오류')+')')}
+async function add(c,o){
+  try{
+    if(S.mode==='db'){S.base.collection(c).add(o).catch(fail)}
+    else{S.d[c].push(Object.assign({id:uid()},o));lsSave();render()}
+    return true;
+  }catch(e){fail(e);return false}
+}
+async function put(c,id,o){
+  try{
+    if(S.mode==='db'){S.base.collection(c).doc(id).set(o).catch(fail)}
+    else{const i=S.d[c].findIndex(x=>x.id===id);if(i>=0)S.d[c][i]=Object.assign({id},o);else S.d[c].push(Object.assign({id},o));lsSave();render()}
+    return true;
+  }catch(e){fail(e);return false}
+}
+async function del(c,id){
+  try{
+    if(S.mode==='db'){S.base.collection(c).doc(id).delete().catch(()=>toast('지우지 못했어요'))}
+    else{S.d[c]=S.d[c].filter(x=>x.id!==id);lsSave();render()}
+  }catch(e){toast('지우지 못했어요')}
+}
+async function connect(){
+  S.mode='loading';render();
+  try{
+    if(!window.firebase)throw new Error('sdk');
+    if(!firebase.apps.length)firebase.initializeApp(FB);
+    const fs=firebase.firestore();
+    try{await fs.enablePersistence({synchronizeTabs:true})}catch(e){}
+    await Promise.race([firebase.auth().signInAnonymously(),new Promise((_,j)=>setTimeout(()=>j(new Error('timeout')),12000))]);
+    S.base=fs.collection('shops').doc(S.code);
+    S.mode='db';
+    COLS.forEach(c=>{
+      S.base.collection(c).onSnapshot(snap=>{
+        S.d[c]=snap.docs.map(x=>Object.assign({id:x.id},x.data()));
+        render();
+      },e=>toast('연결 문제 ('+((e&&e.code)||'')+')'));
+    });
+    render();
+  }catch(e){S.mode='local';lsLoad();render();toast('인터넷 연결이 안 돼서 이 폰에만 저장해요')}
+}
+async function init(){
+  S.code=getCode();
+  if(!S.code){S.mode='setup';render();return}
+  await connect();
+}
+
+/* ---------- 계산 ---------- */
+const GROUP={g:['m',1],kg:['m',1000],ml:['v',1],L:['v',1000]};
+function conv(q,from,to){
+  if(from===to)return q;
+  const a=GROUP[from],b=GROUP[to];
+  if(a&&b&&a[0]===b[0])return q*a[1]/b[1];
+  return null;
+}
+// 재료의 현재 단위·단가: 가장 최근 3번 매입의 평균 (여러 가게에서 산 가격이 섞여도 평균으로)
+function itemInfo(name){
+  const ps=S.d.purchases.filter(p=>p.item===name&&p.qty>0).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  if(!ps.length)return null;
+  const unit=ps[0].unit;
+  const use=ps.filter(p=>conv(1,p.unit,unit)!==null).slice(0,3);
+  let q=0,a=0;use.forEach(p=>{q+=conv(p.qty,p.unit,unit);a+=(+p.amount||0)});
+  return q>0?{unit,price:a/q}:null;
+}
+function allItems(){
+  const s=new Set();
+  S.d.purchases.forEach(p=>p.item&&s.add(p.item));
+  S.d.counts.forEach(c=>(c.lines||[]).forEach(l=>s.add(l.item)));
+  S.d.menus.forEach(m=>(m.lines||[]).forEach(l=>s.add(l.item)));
+  S.d.wastes.forEach(w=>w.item&&s.add(w.item));
+  return [...s].sort((a,b)=>a.localeCompare(b,'ko'));
+}
+function allStores(){return [...new Set(S.d.purchases.map(p=>p.store).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'))}
+function unitOf(n){
+  const i=itemInfo(n);if(i)return i.unit;
+  const e=S.extra.find(x=>x.item===n);if(e)return e.unit;
+  for(const c of S.d.counts){const l=(c.lines||[]).find(l=>l.item===n);if(l)return l.unit}
+  return '개';
+}
+function sortedCounts(){return [...S.d.counts].sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.id).localeCompare(String(b.id)))}
+
+// 재고조사 사이의 한 구간 계산: (시작 재고 + 그 사이 매입 − 끝 재고) = 실제로 쓴 재료비
+function calc(s,e){
+  const end=e?e.date:'9999-12-31';
+  const inR=d=>d>s.date&&d<=end;
+  const P=S.d.purchases.filter(p=>inR(p.date)),W=S.d.wastes.filter(p=>inR(p.date)),L=S.d.sales.filter(p=>inR(p.date));
+  const startV=sum(s.lines||[],l=>l.value),buy=sum(P,p=>p.amount),waste=sum(W,w=>w.value),sales=sum(L,x=>x.amount);
+  const r={start:s.date,end:e?e.date:null,startV,buy,waste,sales,closed:!!e,P,W,L};
+  if(e){
+    r.endV=sum(e.lines||[],l=>l.value);
+    r.cost=startV+buy-r.endV;
+    r.ratio=sales>0?r.cost/sales:null;
+    r.wasteRatio=buy+startV>0?waste/(buy+startV):null;
+    const names=new Set([...(s.lines||[]).map(l=>l.item),...(e.lines||[]).map(l=>l.item),...P.map(p=>p.item)]);
+    r.rows=[...names].map(n=>{
+      const sl=(s.lines||[]).find(l=>l.item===n),el=(e.lines||[]).find(l=>l.item===n);
+      const info=itemInfo(n);const unit=info?info.unit:(sl?sl.unit:el?el.unit:'');
+      let bq=0,bv=0;P.filter(p=>p.item===n).forEach(p=>{const c=conv(p.qty,p.unit,unit);bq+=c===null?p.qty:c;bv+=(+p.amount||0)});
+      const sq=sl?sl.qty:0,eq=el?el.qty:0,sv=sl?sl.value:0,ev=el?el.value:0;
+      const wq=W.filter(w=>w.item===n).reduce((t,w)=>t+(+w.qty||0),0);
+      return {item:n,unit,used:sq+bq-eq,cost:sv+bv-ev,waste:wq};
+    }).sort((a,b)=>b.cost-a.cost);
+  }
+  return r;
+}
+function periods(){
+  const cs=sortedCounts(),out=[];
+  for(let i=0;i<cs.length;i++)out.push(calc(cs[i],cs[i+1]||null));
+  return out;
+}
+function menuCost(m){
+  let cost=0;const miss=[];const lines=(m.lines||[]).map(l=>{
+    const i=itemInfo(l.item);
+    if(!i){miss.push(l.item);return {c:null,note:'가격 없음 (장본 기록 필요)'}}
+    let q=conv(+l.qty||0,l.unit,i.unit);
+    if(q===null){if(l.unit===i.unit)q=+l.qty||0;else{miss.push(l.item);return {c:null,note:'단위가 달라요 ('+i.unit+' 기준)'}}}
+    const c=q*i.price;cost+=c;return {c,note:'≈ '+won(c)};
+  });
+  return {cost,miss,lines};
+}
+
+/* ---------- 화면 ---------- */
+const TABS=[['home','🏠','홈'],['log','📒','기록'],['stock','📦','재고'],['menu','🍽️','메뉴'],['report','📊','정리']];
+function render(){
+  const act=document.activeElement;
+  if(S.tab==='stock'&&act&&act.matches&&act.matches('#main input'))return;
+  $('#badge').textContent=S.mode==='db'?'함께 보는 중':S.mode==='local'?'이 폰에만 저장':S.mode==='setup'?'시작 전':'불러오는 중';
+  $('#badge').className='badge'+(S.mode==='db'?' db':'');
+  if(S.mode==='setup'){$('#tabs').innerHTML='';$('#main').innerHTML=vSetup();return}
+  $('#tabs').innerHTML=TABS.map(t=>`<button class="${S.tab===t[0]?'on':''}" data-act="tab" data-v="${t[0]}"><span>${t[1]}</span>${t[2]}</button>`).join('');
+  const v={home:vHome,log:vLog,stock:vStock,menu:vMenu,report:vReport}[S.tab];
+  $('#main').innerHTML=S.mode==='loading'?'<div class="card">불러오는 중이에요…</div>':v();
+}
+function vSetup(){
+  return `<div class="card hl"><h2>처음이세요?</h2>
+  <p>가게 장부를 새로 만들어요. 만들고 나면 <b>엄마에게 보낼 링크</b>가 생겨요. 그 링크로 열면 엄마 폰에서도 같은 장부가 보여요.</p>
+  <button class="btn" data-act="newshop">새 장부 만들기</button></div>
+  <div class="card"><h2>이미 장부가 있어요</h2>
+  <p class="sub">받은 링크로 열면 자동으로 연결돼요. 링크가 없으면 코드를 직접 넣어주세요.</p>
+  <input id="codein" placeholder="장부 코드 (24자리)" autocapitalize="off" autocomplete="off">
+  <button class="btn alt" data-act="usecode">이 코드로 연결</button></div>`;
+}
+function openSettings(){
+  const db=S.mode==='db';
+  openModal(`<h2>⚙️ 설정</h2>
+  <p class="sub">${db?'지금 <b>함께 보는 장부</b>에 연결돼 있어요. 어느 폰에서 입력해도 모두에게 보여요.':'지금은 <b>이 폰에만</b> 저장되고 있어요 (인터넷 연결 문제일 수 있어요).'}</p>
+  ${S.code?`<h3>엄마 폰에 보낼 링크</h3><input id="slink" readonly value="${esc(shareLink())}" onclick="this.select()">
+  <button class="btn gray" id="copylink">링크 복사</button>
+  <p class="sub">이 링크를 아는 사람만 장부를 볼 수 있어요. 가족에게만 보내주세요. 폰에서 이 링크를 연 다음 "홈 화면에 추가"를 하면 앱처럼 쓸 수 있어요.</p>`:''}
+  <h3>백업</h3>
+  <button class="btn gray" id="exp">기록 파일로 내려받기</button>
+  <label>백업 파일 불러오기</label><input type="file" id="imp" accept="application/json,.json">
+  ${S.code?`<h3>연결 끊기</h3><button class="btn red" id="leave">이 폰에서 장부 연결 끊기</button>`:''}
+  <button class="btn gray" onclick="closeModal()">닫기</button>`);
+  const cl=$('#copylink');
+  if(cl)cl.onclick=async()=>{try{await navigator.clipboard.writeText(shareLink());toast('링크를 복사했어요')}catch(e){$('#slink').select();toast('길게 눌러서 복사해 주세요')}};
+  $('#exp').onclick=()=>{
+    const blob=new Blob([JSON.stringify(S.d)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='가계부백업_'+today()+'.json';document.body.appendChild(a);a.click();a.remove();
+  };
+  $('#imp').onchange=async e=>{
+    const f=e.target.files[0];if(!f)return;
+    try{
+      const j=JSON.parse(await f.text());let n=0;
+      for(const c of COLS){for(const r of (j[c]||[])){const id=r.id||uid();const o=Object.assign({},r);delete o.id;await put(c,id,o);n++}}
+      closeModal();toast(n+'건 불러왔어요');
+    }catch(err){toast('파일을 읽지 못했어요')}
+  };
+  const lv=$('#leave');
+  if(lv)lv.onclick=async()=>{
+    if(!(await confirmBox('이 폰에서 장부 연결을 끊을까요? (장부 자체는 지워지지 않아요)')))return;
+    try{localStorage.removeItem(LSCODE)}catch(e){}
+    location.hash='';location.reload();
+  };
+}
+
+function vHome(){
+  const ps=periods(),cur=ps[ps.length-1];
+  let h=`<div class="grid3">
+    <button class="big" data-act="buy"><span>🛒</span>장봤어요</button>
+    <button class="big" data-act="waste"><span>🗑️</span>버렸어요</button>
+    <button class="big" data-act="sale"><span>💰</span>매출</button></div>`;
+  if(!cur){
+    return h+`<div class="card hl"><h2>① 처음 한 번만 해주세요</h2>
+    <p>지금 가게에 <b>남아 있는 재료</b>를 한 번 세어서 입력해 주세요. 거기서부터 정확한 계산이 시작돼요.</p>
+    <p class="sub">재료 이름이 아직 없으면, 먼저 위의 "장봤어요"로 최근 영수증을 한두 장 넣어두면 편해요.</p>
+    <button class="btn" data-act="tab" data-v="stock">남은 재료 세러 가기</button></div>
+    <div class="card"><h2>이 앱은 이렇게 써요</h2>
+    <p>🛒 장볼 때마다 영수증대로 입력 (어디서 샀는지도)</p>
+    <p>🗑️ 버린 게 있으면 입력</p>
+    <p>💰 매출 입력 (배민, 쿠팡이츠, 매장)</p>
+    <p>📦 한 달에 한 번쯤 남은 재료 세기 → 그 사이에 <b>실제로 쓴 재료비</b>와 원가율이 자동 계산돼요. "정확히 한 달"일 필요는 없어요.</p></div>`;
+  }
+  const open=cur,since=dayDiff(open.start,today());
+  h+=`<div class="card"><h2>지금 진행 중 (${md(open.start)} 재고조사 이후 ${since}일째)</h2>
+    <div class="kv"><span>장본 금액</span><b>${won(open.buy)}</b></div>
+    <div class="kv"><span>버린 재료</span><b>${won(open.waste)}</b></div>
+    <div class="kv"><span>매출</span><b>${won(open.sales)}</b></div>
+    <p class="sub">남은 재료를 다시 세면 이 기간의 원가가 확정돼요.</p>
+    <button class="btn ${since>=28?'':'alt'}" data-act="tab" data-v="stock">📦 남은 재료 세기</button></div>`;
+  if(since>=28)h=h.replace('<div class="card"><h2>지금 진행','<div class="card warn"><h2>지금 진행');
+  const last=ps.length>=2?ps[ps.length-2]:null;
+  if(last){
+    h+=`<div class="card hl"><h2>지난 계산 결과 (${md(last.start)} ~ ${md(last.end)})</h2>
+    <div class="kv"><span>실제로 쓴 재료비</span><b>${won(last.cost)}</b></div>
+    <div class="kv"><span>매출</span><b>${won(last.sales)}</b></div>
+    <div class="kv total"><span>원가율</span><b>${last.ratio==null?'-':(last.ratio*100).toFixed(1)+'%'}</b></div>
+    <button class="btn alt" data-act="tab" data-v="report">자세히 보기</button></div>`;
+  }
+  return h;
+}
+
+function vLog(){
+  const E=[];
+  S.d.purchases.forEach(p=>E.push({c:'purchases',id:p.id,date:p.date,k:'buy',t:'장봄',m:`${esc(p.item)} ${num(p.qty)}${esc(p.unit)}`,s:esc(p.store||''),a:won(p.amount)}));
+  S.d.wastes.forEach(p=>E.push({c:'wastes',id:p.id,date:p.date,k:'waste',t:'버림',m:`${esc(p.item)} ${num(p.qty)}${esc(p.unit||'')}`,s:esc(p.reason||''),a:won(p.value)}));
+  S.d.sales.forEach(p=>E.push({c:'sales',id:p.id,date:p.date,k:'sale',t:'매출',m:esc(p.channel),s:'',a:won(p.amount)}));
+  S.d.counts.forEach(p=>E.push({c:'counts',id:p.id,date:p.date,k:'count',t:'재고조사',m:`재료 ${(p.lines||[]).length}가지`,s:'',a:won(sum(p.lines||[],l=>l.value))}));
+  E.sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.id).localeCompare(String(a.id)));
+  const rows=E.slice(0,80).map(e=>`<div class="log"><span class="t ${e.k}">${e.t}</span><div class="m">${md(e.date)} · ${e.m}<small>${e.s}</small></div><b>${e.a}</b><button class="x" data-act="del" data-c="${e.c}" data-id="${esc(e.id)}">✕</button></div>`).join('');
+  return `<div class="card"><h2>최근 기록</h2>${rows||'<p class="sub">아직 기록이 없어요. 홈에서 입력해 보세요.</p>'}${E.length>80?'<p class="sub">최근 80건만 보여요.</p>':''}</div>`;
+}
+
+function vStock(){
+  if(!S.stockDate)S.stockDate=today();
+  const names=[...new Set([...allItems(),...S.extra.map(x=>x.item)])];
+  const cs=sortedCounts(),lastC=cs[cs.length-1];
+  const first=!lastC;
+  let h=`<div class="card"><h2>📦 남은 재료 세기</h2>
+  <p class="sub">${first?'이번이 시작점이에요. ':''}장사 끝나고 가게에 <b>남아 있는 양</b>을 적어주세요. 없는 건 비워두면 0으로 계산돼요. 금액은 최근 산 가격으로 자동 계산돼요.</p>
+  <label>센 날짜</label><input type="date" id="sdate" value="${S.stockDate}">`;
+  if(!names.length)h+=`<p class="sub" style="margin-top:12px">아직 재료가 없어요. 아래에서 추가하거나, 홈에서 "장봤어요"를 먼저 입력해 주세요.</p>`;
+  h+=names.map(n=>{
+    const u=unitOf(n),info=itemInfo(n),prev=lastC&&(lastC.lines||[]).find(l=>l.item===n);
+    const v=S.draft[n]||'';
+    const est=v!==''&&info?won((+v||0)*info.price):'';
+    return `<div class="stock"><div>${esc(n)}<small>${prev?'지난번 '+num(prev.qty)+esc(prev.unit):''}${info?' · 단가 약 '+won(info.price)+'/'+esc(info.unit):' · 산 기록 없음'}</small></div>
+    <div><div class="inl"><input type="number" inputmode="decimal" step="any" min="0" data-stock="${esc(n)}" value="${esc(v)}" placeholder="0"><i>${esc(u)}</i></div><small data-est="${esc(n)}" style="color:var(--sub);font-size:12px;text-align:right;display:block">${est}</small></div></div>`;
+  }).join('');
+  h+=`<h3>다른 재료 추가</h3><div class="inl"><input id="xname" placeholder="재료 이름" style="flex:2"><select id="xunit" style="flex:1">${UNITS.map(u=>`<option>${u}</option>`).join('')}</select></div>
+  <button class="btn gray" data-act="addextra">+ 재료 추가</button>
+  <button class="btn" data-act="savestock">이대로 저장하기</button></div>`;
+  return h;
+}
+
+function vMenu(){
+  const ms=[...S.d.menus].sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko'));
+  let h=`<div class="card"><h2>🍽️ 메뉴별 원가</h2><p class="sub">메뉴마다 들어가는 재료와 양을 적어두면, 최근 산 가격으로 원가와 원가율이 자동 계산돼요. 재료값이 오르면 저절로 바뀌어요.</p>
+  <button class="btn" data-act="menunew">+ 메뉴 추가</button></div>`;
+  h+=ms.map(m=>{
+    const c=menuCost(m),price=+m.price||0;
+    const r=price>0?c.cost/price:null;
+    const cls=r==null?'':r>0.4?'neg':'pos';
+    return `<div class="card"><div class="kv" style="border:0"><b style="font-size:17px">${esc(m.name)}</b><span>판매가 ${won(price)}</span></div>
+    <div class="kv"><span>재료 원가</span><b>${won(c.cost)}</b></div>
+    <div class="kv"><span>남는 돈 (배달앱 수수료 전)</span><b>${won(price-c.cost)}</b></div>
+    <div class="kv"><span>원가율</span><b class="${cls}">${r==null?'-':(r*100).toFixed(1)+'%'}</b></div>
+    ${c.miss.length?`<p class="sub neg">가격 확인 필요: ${c.miss.map(esc).join(', ')}</p>`:''}
+    <button class="btn alt sm" data-act="menuedit" data-id="${esc(m.id)}">수정</button><button class="btn gray sm" data-act="del" data-c="menus" data-id="${esc(m.id)}">삭제</button></div>`;
+  }).join('');
+  return h;
+}
+
+function storeCompare(){
+  const by={};
+  S.d.purchases.forEach(p=>{if(!p.store||!(p.qty>0))return;const i=itemInfo(p.item);if(!i)return;const q=conv(p.qty,p.unit,i.unit);if(q===null)return;
+    const o=by[p.item]=by[p.item]||{unit:i.unit,st:{}};const s=o.st[p.store]=o.st[p.store]||{q:0,a:0};s.q+=q;s.a+=(+p.amount||0)});
+  return Object.keys(by).map(n=>{
+    const l=Object.entries(by[n].st).map(([s,v])=>({s,p:v.a/v.q})).sort((a,b)=>a.p-b.p);
+    return {item:n,unit:by[n].unit,list:l};
+  }).filter(x=>x.list.length>=2).sort((a,b)=>(b.list[b.list.length-1].p/b.list[0].p)-(a.list[a.list.length-1].p/a.list[0].p));
+}
+
+function vReport(){
+  const ps=periods().filter(p=>p.closed);
+  let h='';
+  if(!ps.length){
+    h+=`<div class="card"><h2>📊 정리</h2><p>남은 재료를 <b>두 번</b> 세면, 그 사이 기간의 실제 재료비와 원가율이 여기에 나와요.</p><p class="sub">지금까지 재고조사 ${S.d.counts.length}번 했어요.</p></div>`;
+  }else{
+    if(S.pick==null||S.pick>=ps.length)S.pick=ps.length-1;
+    const r=ps[S.pick];
+    h+=`<div class="card"><h2>📊 기간 고르기</h2><div class="chips">${ps.map((p,i)=>`<button class="chip ${i===S.pick?'on':''}" data-act="pick" data-v="${i}">${md(p.start)}~${md(p.end)}</button>`).join('')}</div></div>
+    <div class="card hl"><h2>${md(r.start)} ~ ${md(r.end)} (${dayDiff(r.start,r.end)}일)</h2>
+    <div class="kv"><span>처음 남아 있던 재료</span><b>${won(r.startV)}</b></div>
+    <div class="kv"><span>+ 이 기간에 장본 금액</span><b>${won(r.buy)}</b></div>
+    <div class="kv"><span>− 끝에 남은 재료</span><b>${won(r.endV)}</b></div>
+    <div class="kv total"><span>= 실제 쓴 재료비</span><b>${won(r.cost)}</b></div>
+    <div class="kv"><span>매출</span><b>${won(r.sales)}</b></div>
+    <div class="kv"><span>원가율 (재료비 ÷ 매출)</span><b>${r.ratio==null?'매출 입력 필요':(r.ratio*100).toFixed(1)+'%'}</b></div>
+    <div class="kv"><span>그중 버린 재료</span><b>${won(r.waste)}${r.wasteRatio!=null?' ('+(r.wasteRatio*100).toFixed(1)+'%)':''}</b></div>
+    ${r.cost<0?'<p class="neg">재료비가 마이너스예요. 재고 수량이나 단위를 확인해 주세요.</p>':''}
+    ${r.sales===0?'<p class="sub">이 기간 매출이 입력되지 않았어요.</p>':''}</div>
+    <div class="card"><h2>재료별로 얼마나 썼나</h2><table><tr><th>재료</th><th>쓴 양</th><th>쓴 금액</th><th>버린 양</th></tr>
+    ${r.rows.slice(0,20).map(x=>`<tr><td>${esc(x.item)}</td><td class="${x.used<0?'neg':''}">${num(x.used)}${esc(x.unit)}${x.used<0?' ⚠':''}</td><td>${won(x.cost)}</td><td>${x.waste?num(x.waste)+esc(x.unit):'-'}</td></tr>`).join('')}</table>
+    <p class="sub">⚠ 표시는 쓴 양이 마이너스라서 세는 양이나 단위를 확인해야 해요.</p></div>`;
+  }
+  const sc=storeCompare();
+  h+=`<div class="card"><h2>🏪 어디가 싼가</h2>${sc.length?sc.slice(0,15).map(x=>`<h3>${esc(x.item)} <span class="sub">(${esc(x.unit)}당)</span></h3>${x.list.map((l,i)=>`<div class="kv"><span>${esc(l.s)}${i===0?' 👍 가장 쌈':''}</span><b>${won(l.p)}${i>0?` <span class="neg">+${Math.round((l.p/x.list[0].p-1)*100)}%</span>`:''}</b></div>`).join('')}`).join(''):'<p class="sub">같은 재료를 두 곳 이상에서 사면 가게별 가격 비교가 여기에 나와요.</p>'}</div>`;
+  return h;
+}
+
+/* ---------- 입력 창 ---------- */
+function dls(){return `<datalist id="dlI">${allItems().map(i=>`<option value="${esc(i)}">`).join('')}</datalist><datalist id="dlS">${allStores().map(i=>`<option value="${esc(i)}">`).join('')}</datalist>`}
+function openModal(html){const m=$('#modal');m.innerHTML=`<div class="sheet">${html}</div>`;m.hidden=false;m.onclick=e=>{if(e.target===m)closeModal()}}
+function closeModal(){const m=$('#modal');m.hidden=true;m.innerHTML=''}
+function unitSel(sel,cls){return `<select class="${cls||''}">${UNITS.map(u=>`<option ${u===sel?'selected':''}>${u}</option>`).join('')}</select>`}
+function confirmBox(msg){return new Promise(res=>{openModal(`<h2>${esc(msg)}</h2><button class="btn red" id="cy">네, 지울게요</button><button class="btn gray" id="cn">아니요</button>`);$('#cy').onclick=()=>{closeModal();res(true)};$('#cn').onclick=()=>{closeModal();res(false)}})}
+
+function buyRow(){return `<div class="row"><input class="full ri" list="dlI" placeholder="재료 이름 (예: 양파)"><input class="rq" type="number" inputmode="decimal" step="any" min="0" placeholder="양"><div style="display:contents">${unitSel('kg','ru')}</div><input class="ra" type="number" inputmode="numeric" min="0" placeholder="금액(원)"></div>`}
+function openBuy(){
+  openModal(`<h2>🛒 장봤어요</h2><p class="sub">영수증 한 장씩 입력해요.</p>${dls()}
+  <label>날짜</label><input type="date" id="bd" value="${today()}">
+  <label>어디서 샀어요?</label><input id="bs" list="dlS" placeholder="예: 시장, 쿠팡, 농협마트">
+  <div id="rows">${buyRow()}</div>
+  <button class="btn gray" id="addrow">+ 재료 한 줄 더</button>
+  <button class="btn" id="bsave">저장</button><button class="btn gray" onclick="closeModal()">닫기</button>`);
+  const rows=$('#rows');
+  $('#addrow').onclick=()=>rows.insertAdjacentHTML('beforeend',buyRow());
+  rows.addEventListener('change',e=>{if(e.target.classList.contains('ri')){const i=itemInfo(norm(e.target.value));if(i){const r=e.target.closest('.row');r.querySelector('.ru').value=i.unit}}});
+  $('#bsave').onclick=async()=>{
+    const date=$('#bd').value,store=norm($('#bs').value);
+    const lines=[...rows.querySelectorAll('.row')].map(r=>({item:norm(r.querySelector('.ri').value),qty:+r.querySelector('.rq').value,unit:r.querySelector('.ru').value,amount:+r.querySelector('.ra').value})).filter(l=>l.item&&l.qty>0);
+    if(!date){toast('날짜를 골라주세요');return}
+    if(!lines.length){toast('재료 이름과 양을 적어주세요');return}
+    if(lines.some(l=>!(l.amount>=0)||isNaN(l.amount))){toast('금액을 확인해 주세요');return}
+    let ok=true;for(const l of lines){ok=await add('purchases',{date,store,item:l.item,qty:l.qty,unit:l.unit,amount:l.amount})&&ok}
+    if(ok){closeModal();toast('저장했어요 ✅')}
+  };
+}
+function openWaste(){
+  openModal(`<h2>🗑️ 버렸어요</h2>${dls()}
+  <label>날짜</label><input type="date" id="wd" value="${today()}">
+  <label>어떤 재료?</label><input id="wi" list="dlI" placeholder="예: 대파">
+  <label>얼마나?</label><div class="inl"><input id="wq" type="number" inputmode="decimal" step="any" min="0" placeholder="양"><div id="wu" style="width:90px">${unitSel('kg')}</div></div>
+  <label>이유</label><div class="chips" id="wr">${REASONS.map((r,i)=>`<button class="chip ${i===0?'on':''}" data-r="${r}">${r}</button>`).join('')}</div>
+  <p class="sub" id="wv"></p>
+  <button class="btn" id="wsave">저장</button><button class="btn gray" onclick="closeModal()">닫기</button>`);
+  let reason=REASONS[0];
+  $('#wr').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;reason=b.dataset.r;$('#wr').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===b))};
+  const val=()=>{const n=norm($('#wi').value),i=itemInfo(n),q=+$('#wq').value,u=$('#wu select').value;if(!i||!(q>0))return null;const c=conv(q,u,i.unit);return c===null?null:Math.round(c*i.price)};
+  const upd=()=>{const v=val();$('#wv').textContent=v==null?'':'버린 금액은 약 '+won(v)+'으로 계산돼요'};
+  $('#wi').onchange=()=>{const i=itemInfo(norm($('#wi').value));if(i)$('#wu select').value=i.unit;upd()};
+  $('#wq').oninput=upd;$('#wu').onchange=upd;
+  $('#wsave').onclick=async()=>{
+    const item=norm($('#wi').value),qty=+$('#wq').value,unit=$('#wu select').value,date=$('#wd').value;
+    if(!item||!(qty>0)){toast('재료와 양을 적어주세요');return}
+    if(!itemInfo(item))toast('산 기록이 없어서 금액은 0원으로 들어가요');
+    if(await add('wastes',{date,item,qty,unit,reason,value:val()||0})){closeModal();toast('저장했어요 ✅')}
+  };
+}
+function openSale(){
+  openModal(`<h2>💰 매출</h2>
+  <label>날짜</label><input type="date" id="sd" value="${today()}">
+  <label>어디서 팔았어요?</label><div class="chips" id="sc">${CHANNELS.map((r,i)=>`<button class="chip ${i===0?'on':''}" data-r="${r}">${r}</button>`).join('')}</div>
+  <label>금액(원)</label><input id="sa" type="number" inputmode="numeric" min="0" placeholder="예: 350000">
+  <p class="sub">하루 합계로 넣어도 되고, 며칠치를 한 번에 넣어도 돼요 (그 마지막 날짜로).</p>
+  <button class="btn" id="ssave">저장</button><button class="btn gray" onclick="closeModal()">닫기</button>`);
+  let ch=CHANNELS[0];
+  $('#sc').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;ch=b.dataset.r;$('#sc').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===b))};
+  $('#ssave').onclick=async()=>{
+    const amount=+$('#sa').value,date=$('#sd').value;
+    if(!(amount>0)||!date){toast('금액을 적어주세요');return}
+    if(await add('sales',{date,channel:ch,amount})){closeModal();toast('저장했어요 ✅')}
+  };
+}
+function mRow(l){l=l||{item:'',qty:'',unit:'g'};return `<div class="mrow"><input class="mi" list="dlI" placeholder="재료" value="${esc(l.item)}"><input class="mq" type="number" inputmode="decimal" step="any" min="0" placeholder="양" value="${esc(l.qty)}">${unitSel(l.unit,'mu')}<div class="c"></div></div>`}
+function openMenu(id){
+  const m=id?S.d.menus.find(x=>x.id===id):null;
+  openModal(`<h2>${m?'메뉴 수정':'메뉴 추가'}</h2>${dls()}
+  <label>메뉴 이름</label><input id="mn" value="${esc(m?m.name:'')}" placeholder="예: 김치찌개">
+  <label>판매가(원) — 배달앱 가격</label><input id="mp" type="number" inputmode="numeric" value="${esc(m?m.price:'')}" placeholder="예: 9000">
+  <h3>1인분에 들어가는 재료</h3><div id="mrows">${(m&&m.lines&&m.lines.length?m.lines:[null,null,null]).map(l=>mRow(l)).join('')}</div>
+  <button class="btn gray" id="madd">+ 재료 한 줄 더</button>
+  <div class="card hl" style="margin:8px 0"><div class="kv" style="border:0"><span>재료 원가</span><b id="mc">0원</b></div><div class="kv" style="border:0"><span>원가율</span><b id="mr">-</b></div></div>
+  <button class="btn" id="msave">저장</button><button class="btn gray" onclick="closeModal()">닫기</button>`);
+  const rows=$('#mrows');
+  const read=()=>[...rows.querySelectorAll('.mrow')].map(r=>({item:norm(r.querySelector('.mi').value),qty:+r.querySelector('.mq').value,unit:r.querySelector('.mu').value}));
+  const upd=()=>{
+    const lines=read();const c=menuCost({lines});
+    [...rows.querySelectorAll('.mrow')].forEach((r,i)=>{r.querySelector('.c').textContent=lines[i].item?c.lines[i].note:''});
+    const p=+$('#mp').value;$('#mc').textContent=won(c.cost);$('#mr').textContent=p>0?(c.cost/p*100).toFixed(1)+'%':'-';
+  };
+  $('#madd').onclick=()=>{rows.insertAdjacentHTML('beforeend',mRow())};
+  $('#mdl');
+  rows.addEventListener('input',upd);rows.addEventListener('change',e=>{if(e.target.classList.contains('mi')){const i=itemInfo(norm(e.target.value));const r=e.target.closest('.mrow');if(i&&!r.querySelector('.mq').value){r.querySelector('.mu').value=(i.unit==='kg'?'g':i.unit==='L'?'ml':i.unit)}}upd()});
+  $('#mp').oninput=upd;upd();
+  $('#msave').onclick=async()=>{
+    const name=norm($('#mn').value),price=+$('#mp').value,lines=read().filter(l=>l.item&&l.qty>0);
+    if(!name){toast('메뉴 이름을 적어주세요');return}
+    if(!lines.length){toast('재료를 한 가지 이상 적어주세요');return}
+    const ok=m?await put('menus',m.id,{name,price,lines}):await add('menus',{name,price,lines});
+    if(ok){closeModal();toast('저장했어요 ✅')}
+  };
+}
+
+/* ---------- 이벤트 ---------- */
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const a=b.dataset.act;
+  if(a==='tab'){S.tab=b.dataset.v;render();window.scrollTo(0,0)}
+  else if(a==='settings')openSettings();
+  else if(a==='newshop'){S.code=newCode();try{localStorage.setItem(LSCODE,S.code)}catch(e){}location.hash='code='+S.code;await connect();openSettings()}
+  else if(a==='usecode'){const c=norm($('#codein').value);if(!/^[A-Za-z0-9]{20,64}$/.test(c)){toast('코드를 다시 확인해 주세요');return}S.code=c;try{localStorage.setItem(LSCODE,c)}catch(e){}location.hash='code='+c;await connect()}
+  else if(a==='buy')openBuy();
+  else if(a==='waste')openWaste();
+  else if(a==='sale')openSale();
+  else if(a==='menunew')openMenu();
+  else if(a==='menuedit')openMenu(b.dataset.id);
+  else if(a==='pick'){S.pick=+b.dataset.v;render()}
+  else if(a==='del'){if(await confirmBox('이 기록을 지울까요?'))await del(b.dataset.c,b.dataset.id)}
+  else if(a==='addextra'){
+    const n=norm($('#xname').value),u=$('#xunit').value;
+    if(!n){toast('재료 이름을 적어주세요');return}
+    if(!S.extra.find(x=>x.item===n))S.extra.push({item:n,unit:u});
+    render();
+  }
+  else if(a==='savestock'){
+    const date=$('#sdate').value;
+    const names=[...new Set([...allItems(),...S.extra.map(x=>x.item)])];
+    const lines=names.filter(n=>S.draft[n]!==undefined&&S.draft[n]!=='').map(n=>{
+      const q=+S.draft[n]||0,i=itemInfo(n);return {item:n,unit:unitOf(n),qty:q,value:Math.round(q*(i?i.price:0))};
+    });
+    if(!date){toast('날짜를 골라주세요');return}
+    if(!lines.length){toast('남은 재료 양을 한 가지 이상 적어주세요');return}
+    const noPrice=lines.filter(l=>!itemInfo(l.item)&&l.qty>0).length;
+    if(await add('counts',{date,lines})){S.draft={};S.extra=[];S.stockDate=null;S.tab='home';render();toast(noPrice?'저장했어요 (산 기록 없는 재료 '+noPrice+'개는 0원)':'저장했어요 ✅')}
+  }
+});
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.dataset&&t.dataset.stock!==undefined){
+    S.draft[t.dataset.stock]=t.value;
+    const i=itemInfo(t.dataset.stock),el=document.querySelector('[data-est="'+CSS.escape(t.dataset.stock)+'"]');
+    if(el)el.textContent=(t.value!==''&&i)?won((+t.value||0)*i.price):'';
+  }
+});
+document.addEventListener('change',e=>{if(e.target.id==='sdate')S.stockDate=e.target.value});
+init();
+</script>
+</body>
+</html>
